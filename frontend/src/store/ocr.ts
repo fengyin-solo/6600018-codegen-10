@@ -2,15 +2,12 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import type { Document, OCRResult, Annotation, CollaborationNote, NoteStatus } from '../types'
 
-export const useOcrStore = defineStore('ocr', () => {
-  const documents = ref<Document[]>([])
-  const currentDoc = ref<Document | null>(null)
-  const isLoading = ref(false)
-  const searchQuery = ref('')
-  const searchResults = ref<OCRResult[]>([])
-  const currentUser = ref('校对员')
+function deepClone<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj))
+}
 
-  const MOCK_DOC: Document = {
+function createMockDoc(): Document {
+  return {
     id: '1',
     name: '论语·学而篇',
     imageUrl: '',
@@ -27,12 +24,26 @@ export const useOcrStore = defineStore('ocr', () => {
     notes: [],
     createdAt: '2025-01-15'
   }
+}
 
-  const VARIANT_DICT: Record<string, string> = {
-    '説': '说', '學': '学', '習': '习', '遠': '远', '樂': '乐', '書': '书',
-    '國': '国', '東': '东', '長': '长', '門': '门', '馬': '马', '鳥': '鸟',
-    '風': '风', '雲': '云', '龍': '龙', '車': '车', '萬': '万', '見': '见',
-  }
+const VARIANT_DICT: Record<string, string> = {
+  '説': '说', '學': '学', '習': '习', '遠': '远', '樂': '乐', '書': '书',
+  '國': '国', '東': '东', '長': '长', '門': '门', '馬': '马', '鳥': '鸟',
+  '風': '风', '雲': '云', '龍': '龙', '車': '车', '萬': '万', '見': '见',
+}
+
+export const useOcrStore = defineStore('ocr', () => {
+  const documents = ref<Document[]>([])
+  const currentDocId = ref<string | null>(null)
+  const isLoading = ref(false)
+  const searchQuery = ref('')
+  const searchResults = ref<OCRResult[]>([])
+  const currentUser = ref('校对员')
+
+  const currentDoc = computed(() => {
+    if (!currentDocId.value) return null
+    return documents.value.find(d => d.id === currentDocId.value) || null
+  })
 
   const pendingNotesCount = computed(() => {
     if (!currentDoc.value) return 0
@@ -50,9 +61,14 @@ export const useOcrStore = defineStore('ocr', () => {
     return currentDoc.value.notes.filter(n => n.resultId === resultId)
   }
 
+  function setCurrentDoc(docId: string | null) {
+    currentDocId.value = docId
+  }
+
   function loadMockDocument() {
-    documents.value = [MOCK_DOC]
-    currentDoc.value = MOCK_DOC
+    const mockDoc = createMockDoc()
+    documents.value = [mockDoc]
+    currentDocId.value = mockDoc.id
   }
 
   async function uploadAndOCR(file: File) {
@@ -73,7 +89,7 @@ export const useOcrStore = defineStore('ocr', () => {
           createdAt: new Date().toISOString()
         }
         documents.value.push(doc)
-        currentDoc.value = doc
+        currentDocId.value = doc.id
       }
     } catch {
       loadMockDocument()
@@ -151,8 +167,8 @@ export const useOcrStore = defineStore('ocr', () => {
   }
 
   return {
-    documents, currentDoc, isLoading, searchQuery, searchResults, currentUser, pendingNotesCount,
-    loadMockDocument, uploadAndOCR, addAnnotation, removeAnnotation,
+    documents, currentDoc, currentDocId, isLoading, searchQuery, searchResults, currentUser, pendingNotesCount,
+    setCurrentDoc, loadMockDocument, uploadAndOCR, addAnnotation, removeAnnotation,
     addNote, updateNoteStatus, removeNote, getNotesForResult, getPendingNotesCountForDoc,
     convertVariant, searchInDocuments, exportTEI
   }

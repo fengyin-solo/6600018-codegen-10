@@ -28,7 +28,7 @@
 
       <!-- Document list -->
       <div class="flex-1 overflow-y-auto space-y-1">
-        <div v-for="d in store.documents" :key="d.id" @click="store.currentDoc = d"
+        <div v-for="d in store.documents" :key="d.id" @click="store.setCurrentDoc(d.id)"
           class="bg-gray-800 rounded p-2 cursor-pointer text-sm"
           :class="store.currentDoc?.id === d.id ? 'ring-1 ring-amber-500' : ''">
           <div class="flex justify-between items-start">
@@ -70,7 +70,7 @@
       <div v-if="store.currentDoc" class="space-y-2">
         <div v-for="r in store.currentDoc.results" :key="r.id"
           class="bg-gray-800 rounded p-2 text-sm"
-          :class="hasPendingNote(r.id) ? 'ring-1 ring-yellow-500' : ''">
+          :class="store.getNotesForResult(r.id).some(n => n.status === 'pending') ? 'ring-1 ring-yellow-500' : ''">
           <div class="flex justify-between">
             <span class="text-white font-medium">{{ r.text }}</span>
             <span class="text-xs px-2 py-0.5 rounded"
@@ -85,11 +85,11 @@
             class="w-full bg-gray-700 rounded px-2 py-1 text-xs mt-1" />
           <div class="flex items-center justify-between mt-2">
             <div class="flex items-center gap-1">
-              <span v-if="getResultNoteCount(r.id) > 0" class="text-xs text-amber-400">
-                {{ getResultNoteCount(r.id) }} 条备注
+              <span v-if="store.getNotesForResult(r.id).length > 0" class="text-xs text-amber-400">
+                {{ store.getNotesForResult(r.id).length }} 条备注
               </span>
-              <span v-if="getResultPendingNoteCount(r.id) > 0" class="text-xs text-yellow-400">
-                ({{ getResultPendingNoteCount(r.id) }} 待处理)
+              <span v-if="store.getNotesForResult(r.id).some(n => n.status === 'pending')" class="text-xs text-yellow-400">
+                ({{ store.getNotesForResult(r.id).filter(n => n.status === 'pending').length }} 待处理)
               </span>
             </div>
             <button @click="openNoteModal(r.id, r.text)"
@@ -155,17 +155,5 @@ function openNoteModal(resultId: string, resultText: string) {
   noteModalResultId.value = resultId
   noteModalResultText.value = resultText
   noteModalVisible.value = true
-}
-
-function getResultNoteCount(resultId: string) {
-  return store.getNotesForResult(resultId).length
-}
-
-function getResultPendingNoteCount(resultId: string) {
-  return store.getNotesForResult(resultId).filter(n => n.status === 'pending').length
-}
-
-function hasPendingNote(resultId: string) {
-  return getResultPendingNoteCount(resultId) > 0
 }
 </script>
