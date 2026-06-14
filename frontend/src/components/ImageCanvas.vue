@@ -10,8 +10,21 @@
     <svg class="absolute inset-0 w-full h-full pointer-events-none">
       <g v-for="r in store.currentDoc?.results || []" :key="r.id">
         <rect :x="r.bbox[0]" :y="r.bbox[1]" :width="r.bbox[2]" :height="r.bbox[3]"
-          fill="none" stroke="rgba(251,191,36,0.6)" stroke-width="2" />
-        <text :x="r.bbox[0]" :y="r.bbox[1] - 5" fill="#fbbf24" font-size="12">{{ r.text }}</text>
+          fill="none" :stroke="getResultStrokeColor(r.id)" stroke-width="2" />
+        <text :x="r.bbox[0]" :y="r.bbox[1] - 5" :fill="getResultStrokeColor(r.id)" font-size="12">{{ r.text }}</text>
+        <!-- Note indicator -->
+        <g v-if="getResultPendingNoteCount(r.id) > 0">
+          <circle :cx="r.bbox[0] + r.bbox[2]" :cy="r.bbox[1]" r="8" fill="#eab308" />
+          <text :x="r.bbox[0] + r.bbox[2]" :y="r.bbox[1] + 4" fill="#000" font-size="10" text-anchor="middle" font-weight="bold">
+            {{ getResultPendingNoteCount(r.id) }}
+          </text>
+        </g>
+        <g v-else-if="getResultNoteCount(r.id) > 0">
+          <circle :cx="r.bbox[0] + r.bbox[2]" :cy="r.bbox[1]" r="7" fill="#22c55e" />
+          <text :x="r.bbox[0] + r.bbox[2]" :y="r.bbox[1] + 4" fill="#fff" font-size="9" text-anchor="middle" font-weight="bold">
+            ✓
+          </text>
+        </g>
       </g>
       <!-- Annotations -->
       <g v-for="a in store.currentDoc?.annotations || []" :key="a.id">
@@ -43,17 +56,14 @@ onMounted(() => {
     const w = mockCanvas.value.width = mockCanvas.value.offsetWidth * 2
     const h = mockCanvas.value.height = mockCanvas.value.offsetHeight * 2
 
-    // Draw mock ancient text background
     ctx.fillStyle = '#f5e6c8'
     ctx.fillRect(0, 0, w, h)
 
-    // Paper texture
     for (let i = 0; i < 5000; i++) {
       ctx.fillStyle = `rgba(139,90,43,${Math.random() * 0.1})`
       ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2)
     }
 
-    // Vertical text columns (right to left)
     ctx.fillStyle = '#2d1810'
     ctx.font = 'bold 48px serif'
     const columns = [
@@ -69,6 +79,24 @@ onMounted(() => {
     })
   }
 })
+
+function getResultNoteCount(resultId: string) {
+  return store.getNotesForResult(resultId).length
+}
+
+function getResultPendingNoteCount(resultId: string) {
+  return store.getNotesForResult(resultId).filter(n => n.status === 'pending').length
+}
+
+function getResultStrokeColor(resultId: string) {
+  if (getResultPendingNoteCount(resultId) > 0) {
+    return 'rgba(234,179,8,0.8)'
+  }
+  if (getResultNoteCount(resultId) > 0) {
+    return 'rgba(34,197,94,0.8)'
+  }
+  return 'rgba(251,191,36,0.6)'
+}
 
 function startDrag(e: MouseEvent) {
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()

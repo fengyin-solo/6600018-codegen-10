@@ -1,7 +1,7 @@
 export interface OCRResult {
   id: string
   text: string
-  bbox: [number, number, number, number]  // x, y, w, h
+  bbox: [number, number, number, number]
   confidence: number
   corrected?: string
 }
@@ -12,6 +12,7 @@ export interface Document {
   imageUrl: string
   results: OCRResult[]
   annotations: Annotation[]
+  notes: CollaborationNote[]
   createdAt: string
 }
 
@@ -21,6 +22,20 @@ export interface Annotation {
   bbox: [number, number, number, number]
   label: string
   content: string
+}
+
+export type NoteStatus = 'pending' | 'resolved' | 'rejected'
+
+export interface CollaborationNote {
+  id: string
+  resultId: string
+  text: string
+  comment: string
+  author: string
+  status: NoteStatus
+  createdAt: string
+  resolvedAt?: string
+  resolver?: string
 }
 
 export interface VariantChar {

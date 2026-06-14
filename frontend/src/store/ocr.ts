@@ -1,6 +1,6 @@
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import type { Document, OCRResult, Annotation } from '../types'
+import type { Document, OCRResult, Annotation, CollaborationNote, NoteStatus } from '../types'
 
 export const useOcrStore = defineStore('ocr', () => {
   const documents = ref<Document[]>([])
@@ -8,8 +8,8 @@ export const useOcrStore = defineStore('ocr', () => {
   const isLoading = ref(false)
   const searchQuery = ref('')
   const searchResults = ref<OCRResult[]>([])
+  const currentUser = ref('校对员')
 
-  // Mock data
   const MOCK_DOC: Document = {
     id: '1',
     name: '论语·学而篇',
@@ -24,6 +24,7 @@ export const useOcrStore = defineStore('ocr', () => {
       { id: 'r7', text: '不亦乐乎', bbox: [200, 130, 160, 40], confidence: 0.92 },
     ],
     annotations: [],
+    notes: [],
     createdAt: '2025-01-15'
   }
 
@@ -31,6 +32,22 @@ export const useOcrStore = defineStore('ocr', () => {
     '説': '说', '學': '学', '習': '习', '遠': '远', '樂': '乐', '書': '书',
     '國': '国', '東': '东', '長': '长', '門': '门', '馬': '马', '鳥': '鸟',
     '風': '风', '雲': '云', '龍': '龙', '車': '车', '萬': '万', '見': '见',
+  }
+
+  const pendingNotesCount = computed(() => {
+    if (!currentDoc.value) return 0
+    return currentDoc.value.notes.filter(n => n.status === 'pending').length
+  })
+
+  function getPendingNotesCountForDoc(docId: string): number {
+    const doc = documents.value.find(d => d.id === docId)
+    if (!doc) return 0
+    return doc.notes.filter(n => n.status === 'pending').length
+  }
+
+  function getNotesForResult(resultId: string): CollaborationNote[] {
+    if (!currentDoc.value) return []
+    return currentDoc.value.notes.filter(n => n.resultId === resultId)
   }
 
   function loadMockDocument() {
@@ -52,13 +69,13 @@ export const useOcrStore = defineStore('ocr', () => {
           imageUrl: URL.createObjectURL(file),
           results: data.results || [],
           annotations: [],
+          notes: [],
           createdAt: new Date().toISOString()
         }
         documents.value.push(doc)
         currentDoc.value = doc
       }
     } catch {
-      // Use mock data as fallback
       loadMockDocument()
     } finally {
       isLoading.value = false
@@ -76,6 +93,37 @@ export const useOcrStore = defineStore('ocr', () => {
   function removeAnnotation(id: string) {
     if (!currentDoc.value) return
     currentDoc.value.annotations = currentDoc.value.annotations.filter(a => a.id !== id)
+  }
+
+  function addNote(resultId: string, text: string, comment: string) {
+    if (!currentDoc.value) return
+    const note: CollaborationNote = {
+      id: Date.now().toString(),
+      resultId,
+      text,
+      comment,
+      author: currentUser.value,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    }
+    currentDoc.value.notes.push(note)
+  }
+
+  function updateNoteStatus(noteId: string, status: NoteStatus) {
+    if (!currentDoc.value) return
+    const note = currentDoc.value.notes.find(n => n.id === noteId)
+    if (note) {
+      note.status = status
+      if (status !== 'pending') {
+        note.resolvedAt = new Date().toISOString()
+        note.resolver = currentUser.value
+      }
+    }
+  }
+
+  function removeNote(noteId: string) {
+    if (!currentDoc.value) return
+    currentDoc.value.notes = currentDoc.value.notes.filter(n => n.id !== noteId)
   }
 
   function convertVariant(text: string): string {
@@ -103,8 +151,9 @@ export const useOcrStore = defineStore('ocr', () => {
   }
 
   return {
-    documents, currentDoc, isLoading, searchQuery, searchResults,
+    documents, currentDoc, isLoading, searchQuery, searchResults, currentUser, pendingNotesCount,
     loadMockDocument, uploadAndOCR, addAnnotation, removeAnnotation,
+    addNote, updateNoteStatus, removeNote, getNotesForResult, getPendingNotesCountForDoc,
     convertVariant, searchInDocuments, exportTEI
   }
 })

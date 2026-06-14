@@ -31,8 +31,17 @@
         <div v-for="d in store.documents" :key="d.id" @click="store.currentDoc = d"
           class="bg-gray-800 rounded p-2 cursor-pointer text-sm"
           :class="store.currentDoc?.id === d.id ? 'ring-1 ring-amber-500' : ''">
-          {{ d.name }}
-          <div class="text-xs text-gray-500">{{ d.results.length }} 行识别</div>
+          <div class="flex justify-between items-start">
+            <span class="truncate">{{ d.name }}</span>
+            <span v-if="store.getPendingNotesCountForDoc(d.id) > 0"
+              class="bg-yellow-500 text-black text-xs px-1.5 py-0.5 rounded font-medium ml-2 flex-shrink-0">
+              {{ store.getPendingNotesCountForDoc(d.id) }}
+            </span>
+          </div>
+          <div class="text-xs text-gray-500">
+            {{ d.results.length }} 行识别
+            <span v-if="d.notes.length > 0" class="ml-2">{{ d.notes.length }} 条备注</span>
+          </div>
         </div>
       </div>
 
@@ -52,10 +61,16 @@
 
     <!-- Right: OCR results & annotations -->
     <div class="w-80 bg-gray-900 p-4 flex flex-col gap-3 border-l border-gray-800 overflow-y-auto">
-      <h3 class="text-amber-300 font-bold text-sm">OCR 识别结果</h3>
+      <div class="flex justify-between items-center">
+        <h3 class="text-amber-300 font-bold text-sm">OCR 识别结果</h3>
+        <span v-if="store.pendingNotesCount > 0" class="text-xs bg-yellow-500 text-black px-2 py-0.5 rounded font-medium">
+          {{ store.pendingNotesCount }} 待跟进
+        </span>
+      </div>
       <div v-if="store.currentDoc" class="space-y-2">
         <div v-for="r in store.currentDoc.results" :key="r.id"
-          class="bg-gray-800 rounded p-2 text-sm">
+          class="bg-gray-800 rounded p-2 text-sm"
+          :class="hasPendingNote(r.id) ? 'ring-1 ring-yellow-500' : ''">
           <div class="flex justify-between">
             <span class="text-white font-medium">{{ r.text }}</span>
             <span class="text-xs px-2 py-0.5 rounded"
@@ -68,6 +83,20 @@
           </div>
           <input v-model="r.corrected" placeholder="人工校正..."
             class="w-full bg-gray-700 rounded px-2 py-1 text-xs mt-1" />
+          <div class="flex items-center justify-between mt-2">
+            <div class="flex items-center gap-1">
+              <span v-if="getResultNoteCount(r.id) > 0" class="text-xs text-amber-400">
+                {{ getResultNoteCount(r.id) }} 条备注
+              </span>
+              <span v-if="getResultPendingNoteCount(r.id) > 0" class="text-xs text-yellow-400">
+                ({{ getResultPendingNoteCount(r.id) }} 待处理)
+              </span>
+            </div>
+            <button @click="openNoteModal(r.id, r.text)"
+              class="text-xs bg-amber-600 hover:bg-amber-500 px-2 py-1 rounded text-white">
+              备注
+            </button>
+          </div>
         </div>
       </div>
 
@@ -83,14 +112,27 @@
         </div>
       </div>
     </div>
+
+    <NoteModal
+      :visible="noteModalVisible"
+      :result-id="noteModalResultId"
+      :result-text="noteModalResultText"
+      @close="noteModalVisible = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useOcrStore } from './store/ocr'
 import ImageCanvas from './components/ImageCanvas.vue'
+import NoteModal from './components/NoteModal.vue'
 
 const store = useOcrStore()
+
+const noteModalVisible = ref(false)
+const noteModalResultId = ref('')
+const noteModalResultText = ref('')
 
 function onUpload(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -107,5 +149,23 @@ function doExport() {
   a.download = `${store.currentDoc?.name || 'export'}.xml`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function openNoteModal(resultId: string, resultText: string) {
+  noteModalResultId.value = resultId
+  noteModalResultText.value = resultText
+  noteModalVisible.value = true
+}
+
+function getResultNoteCount(resultId: string) {
+  return store.getNotesForResult(resultId).length
+}
+
+function getResultPendingNoteCount(resultId: string) {
+  return store.getNotesForResult(resultId).filter(n => n.status === 'pending').length
+}
+
+function hasPendingNote(resultId: string) {
+  return getResultPendingNoteCount(resultId) > 0
 }
 </script>
